@@ -27,5 +27,5 @@ def fetch_tournaments(client, last_time):
         time.sleep(1)
 
 
-client = SmashGGConnectionTHINGY("690ea7f74c5f9b331c7148ba0a7a34e3")
-print(fetch_tournaments(client, 1548009000))
+client = SmashGGConnectionTHINGY("Your token here")
+print(fetch_tournaments(client, int(time.time())))
