@@ -76,13 +76,23 @@ def markAsDone(eventId):
             }
         }
     )
-
+def markAllAsNotDone():
+    r = es.update_by_query(
+        index = "event-data",
+        body = {
+            "query": {
+                "match_all":{}
+            },
+            "script":"ctx._source.done = false"
+        }
+    )
+    print(r)
 
 def addGamesToElastic(tournament_id, event_id, games_data):
     for data in games_data:
         r = es.index(
             index="game-data",
-            id=data["set_id"],
+            id=data["game_id"],
             body={
                 "tournament_id": tournament_id,
                 "event_id": event_id,
@@ -94,7 +104,8 @@ def addGamesToElastic(tournament_id, event_id, games_data):
                 "winner_name": data['winner_name'],
                 "loser_name": data['loser_name'],
                 "winner_char": data['winner_char'],
-                "loser_char": data['loser_char']
+                "loser_char": data['loser_char'],
+                "game_id": data["game_id"]
             }
         )
-        print(r["result"])
+        # print(r["result"])

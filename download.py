@@ -92,6 +92,7 @@ class SmashGGConnectionTHINGY:
                             nodes {
                                 id
                                 games {
+                                    id
                                     winnerId
                                     stage {
                                       name

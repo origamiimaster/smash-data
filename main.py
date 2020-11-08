@@ -62,6 +62,6 @@ def fetchEvents(client):
         tourneyID, eventID = elastic_client.getUnfinishedEvent()
         time.sleep(1)
 
-client = SmashGGConnectionTHINGY("Insert your token")
-# fetch_tournaments(client, int(time.time()))
+client = SmashGGConnectionTHINGY("Insert API TOKEN HERE")
+fetch_tournaments(client, int(time.time()))
 fetchEvents(client)

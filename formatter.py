@@ -86,6 +86,7 @@ def extract_game_data(game, character_map):
         'loser_name': loser_name,
         'winner_char': winner_char,
         'loser_char': loser_char,
+        'game_id': game['id'],
     }
 
 
