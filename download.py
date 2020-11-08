@@ -1,13 +1,14 @@
 import requests
 # Client to download and do all the stuff
 
+
 class SmashGGConnectionTHINGY:
     def __init__(self, api_token):
         self.api = api_token
         self.url = "https://api.smash.gg/gql/alpha"
         self.id = 1386
 
-    def get_tournaments(self,start_time, end_time):
+    def get_tournaments(self, start_time, end_time):
         per_page = 60
         r = requests.post(
             self.url,
@@ -45,7 +46,7 @@ class SmashGGConnectionTHINGY:
                 """,
                 "variables": f'{{"videogameId": {self.id}, "page": {0}, "perPage": {per_page}, "after": {start_time}, "before": {end_time} }}',
             },
-            headers = {
+            headers={
                 'Authorization': f'Bearer {self.api}',
             }
         )
@@ -80,6 +81,7 @@ class SmashGGConnectionTHINGY:
         return r.json()['data']['tournament']
 
     def get_sets(self, event_id, page=1):
+        print(event_id)
         r = requests.post(
             self.url,
             data={

@@ -53,7 +53,7 @@ def extract_game_data(game, character_map):
 
     if len(selections) > 2:
         print(game)
-        raise Exception('hanlde this! too many selections')
+        raise Exception('maybe doubles game')
 
     if selections[0]['entrant']['id'] == winner_id:
         winner = selections[0]
