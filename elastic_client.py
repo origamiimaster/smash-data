@@ -30,7 +30,7 @@ def get_last_timestamp() -> int or None:
     try:
         return int(datetime.datetime.fromtimestamp(
             r["hits"]["hits"][0]["_source"]["timestamp"] / 1000).timestamp())
-    except:
+    except KeyError:
         return None
 
 
