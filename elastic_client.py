@@ -1,9 +1,16 @@
+"""
+This file contains all the functions to connect to the elasticsearch server and modify it's database
+"""
 from elasticsearch import Elasticsearch
 import datetime
+
 es = Elasticsearch()
 
 
-def getLastTimestamp():
+def get_last_timestamp() -> int or None:
+    """
+    Returns the most recent event timestamp from the elasticsearch server
+    """
     r = es.search(
         index="event-data",
         body={
@@ -21,16 +28,18 @@ def getLastTimestamp():
         }
     )
     try:
-        return int(datetime.datetime.fromtimestamp(r["hits"]["hits"][0]["_source"]["timestamp"]/1000).timestamp())
+        return int(datetime.datetime.fromtimestamp(
+            r["hits"]["hits"][0]["_source"]["timestamp"] / 1000).timestamp())
     except:
         return None
 
 
-def uploadEventData(event_data):
-
+def upload_event_data(event_data) -> None:
+    """
+    Adds an event to the elasticsearch server
+    """
     for data in event_data:
-        # try:
-        res = es.index(
+        es.index(
             index="event-data",
             id=data[2],
             body={
@@ -44,7 +53,10 @@ def uploadEventData(event_data):
         )
 
 
-def getUnfinishedEvent():
+def get_unfinished_event() -> (int, int):
+    """
+    Gets the most recent event that is not yet processed, returning it's ID and it's tournament ID
+    """
     r = es.search(
         index="event-data",
         body={
@@ -62,35 +74,47 @@ def getUnfinishedEvent():
                 }
             ]
         }
-    )
-    return r["hits"]["hits"][0]["_source"]["tournament_id"], r["hits"]["hits"][0]["_source"]["event_id"]
+    )["hits"]["hits"][0]
+    return r["_source"]["tournament_id"], r["_source"]["event_id"]
 
 
-def markAsDone(eventId):
-    r = es.update(
+def mark_as_done(event_id: int) -> None:
+    """
+    Marks the given event as done in the elasticsearch server, effectively removing it from the
+    queue
+    """
+    es.update(
         index="event-data",
-        id=eventId,
+        id=event_id,
         body={
             "doc": {
                 "done": True
             }
         }
     )
-def markAllAsNotDone():
-    r = es.update_by_query(
-        index = "event-data",
-        body = {
+
+
+def mark_all_as_not_done() -> None:
+    """
+    Sets all events in the elasticsearch server to be unprocessed
+    """
+    es.update_by_query(
+        index="event-data",
+        body={
             "query": {
-                "match_all":{}
+                "match_all": {}
             },
-            "script":"ctx._source.done = false"
+            "script": "ctx._source.done = false"
         }
     )
-    print(r)
 
-def addGamesToElastic(tournament_id, event_id, games_data):
+
+def add_games_to_elastic(tournament_id: int, event_id: int, games_data: [object]) -> None:
+    """
+    Adds an event to the elasticsearch server
+    """
     for data in games_data:
-        r = es.index(
+        es.index(
             index="game-data",
             id=data["game_id"],
             body={
@@ -108,4 +132,3 @@ def addGamesToElastic(tournament_id, event_id, games_data):
                 "game_id": data["game_id"]
             }
         )
-        # print(r["result"])

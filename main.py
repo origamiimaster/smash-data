@@ -1,5 +1,7 @@
-from download import SmashGGConnectionTHINGY
-# from elastic_client import getLastTimestamp, uploadEventData
+"""
+Contains the functions for getting tournaments and games, and then does it for all games
+"""
+from download import SmashGGClient
 import elastic_client
 import datetime
 import formatter
@@ -7,22 +9,25 @@ import time
 import json
 
 
-def fetch_tournaments(client, last_time):
-    originalStart = int(datetime.datetime(
+def fetch_tournaments(client: SmashGGClient, last_time: int) -> None:
+    """
+    Adds all tournament events to the elasticsearch client
+    """
+    original_start = int(datetime.datetime(
         2018, 12, 1).timestamp())
-    while 1 == 1:
-        start_timestamp = elastic_client.getLastTimestamp()
+    while True:
+        start_timestamp = elastic_client.get_last_timestamp()
         if start_timestamp is None:
-            start_timestamp = originalStart
+            start_timestamp = original_start
         else:
             start_timestamp += 100
-        date = datetime.date.fromtimestamp(start_timestamp)
+
         tournaments = client.get_tournaments(start_timestamp, last_time)
         if tournaments is None:
             break
 
         events_data = formatter.get_events_data(tournaments, 1386)
-        elastic_client.uploadEventData(events_data)
+        elastic_client.upload_event_data(events_data)
 
         start_timestamp = tournaments[-1]['startAt']
 
@@ -31,37 +36,42 @@ def fetch_tournaments(client, last_time):
         time.sleep(1)
 
 
-def fetchEvents(client):
+def fetch_events(client: SmashGGClient) -> None:
+    """
+    Processes each event and then adds all games to elasticsearch
+    """
     with open('characters.json') as f:
-        charData = {}
+        char_data = {}
         for char in json.load(f)["entities"]["character"]:
-            charData[char["id"]] = char["name"]
-    tourneyID, eventID = elastic_client.getUnfinishedEvent()
+            char_data[char["id"]] = char["name"]
+    tourney_id, event_id = elastic_client.get_unfinished_event()
 
-    while not eventID is None:
+    while event_id is not None:
         sets = []
         page = 1
-        while 1 == 1:
-            setsToAdd = client.get_sets(eventID, page)
-            if not setsToAdd:
+        while True:
+            sets_to_add = client.get_sets(event_id, page)
+            if not sets_to_add:
                 break
-            for curSet in setsToAdd:
+            for curSet in sets_to_add:
                 if curSet["games"]:
                     sets.append(curSet)
             page += 1
             time.sleep(1)
         games = formatter.get_games(sets)
-        games_data = formatter.extract_games_data(games, charData)
+        games_data = formatter.extract_games_data(games, char_data)
 
         if not len(games_data) <= 0:
-            elastic_client.addGamesToElastic(tourneyID, eventID, games_data)
-        
-        print("Recorded "+str(len(games_data))+" games")
-        elastic_client.markAsDone(eventID)
+            elastic_client.add_games_to_elastic(tourney_id, event_id, games_data)
 
-        tourneyID, eventID = elastic_client.getUnfinishedEvent()
+        print("Recorded " + str(len(games_data)) + " games")
+        elastic_client.mark_as_done(event_id)
+
+        tourney_id, event_id = elastic_client.get_unfinished_event()
         time.sleep(1)
 
-client = SmashGGConnectionTHINGY("Insert API TOKEN HERE")
-fetch_tournaments(client, int(time.time()))
-fetchEvents(client)
+
+if __name__ == "__main__":
+    my_client = SmashGGClient("Insert API TOKEN HERE")
+    fetch_tournaments(my_client, int(time.time()))
+    fetch_events(my_client)

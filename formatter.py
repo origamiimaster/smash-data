@@ -1,4 +1,13 @@
-def get_event_ids_and_names(tournament, videogame_id):
+"""
+Functions used to reformat the data from graphql queries into the more useful data
+"""
+
+
+# noinspection SpellCheckingInspection
+def get_event_ids_and_names(tournament: dict, videogame_id: int) -> list:
+    """
+    Returns more the names of the events for a given tournament and game id
+    """
     event_names = []
     for event in tournament['events']:
         if event['videogame']['id'] == videogame_id:
@@ -6,7 +15,11 @@ def get_event_ids_and_names(tournament, videogame_id):
     return event_names
 
 
-def get_events_data(tournaments, videogame_id):
+# noinspection SpellCheckingInspection
+def get_events_data(tournaments, videogame_id) -> list:
+    """
+    Returns the data from a tournament list, in an array of tuples
+    """
     data = []
     for t in tournaments:
         event_ids_and_names = get_event_ids_and_names(t, videogame_id)
@@ -16,7 +29,10 @@ def get_events_data(tournaments, videogame_id):
     return data
 
 
-def get_games(event_sets):
+def get_games(event_sets: list) -> list:
+    """
+    gets games from a list of sets
+    """
     games = []
     for event_set in event_sets:
         set_id = event_set['id']
@@ -28,7 +44,10 @@ def get_games(event_sets):
     return games
 
 
-def extract_games_data(games, character_map):
+def extract_games_data(games: list, character_map: dict) -> list:
+    """
+    Converts the GQL game data format to a better format for ES
+    """
     games_data = []
     for game in games:
         data = extract_game_data(game, character_map)
@@ -37,14 +56,17 @@ def extract_games_data(games, character_map):
     return games_data
 
 
-def extract_game_data(game, character_map):
+def extract_game_data(game: dict, character_map: dict) -> set or None:
+    """
+    Converts the GQL game data format to a better format for ES
+    """
     winner_id = game['winnerId']
     stage_name = '' if game['stage'] is None else game['stage']['name']
 
     if winner_id is None:
         return None
 
-    selections = _extract_selections(game)
+    selections = extract_selections(game)
     if selections is None:
         return None
 
@@ -90,7 +112,10 @@ def extract_game_data(game, character_map):
     }
 
 
-def _extract_selections(game):
+def extract_selections(game) -> list or None:
+    """
+    Gets selection values from game data.
+    """
     selections_by_player_id = {}
 
     for selection in game['selections']:
@@ -106,9 +131,12 @@ def _extract_selections(game):
         if player_id in selections_by_player_id:
             # check that it's a perfect copy
             if (
-                selection['entrant']['name'] == selections_by_player_id[player_id]['entrant']['name'] and
-                selection['selectionType'] == selections_by_player_id[player_id]['selectionType'] and
-                selection['selectionValue'] == selections_by_player_id[player_id]['selectionValue']
+                selection['entrant']['name'] ==
+                selections_by_player_id[player_id]['entrant']['name'] and
+                selection['selectionType'] ==
+                selections_by_player_id[player_id]['selectionType'] and
+                selection['selectionValue'] ==
+                selections_by_player_id[player_id]['selectionValue']
             ):
                 continue
             else:
