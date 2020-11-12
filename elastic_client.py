@@ -57,6 +57,7 @@ def get_unfinished_event() -> (int, int):
     """
     Gets the most recent event that is not yet processed, returning it's ID and it's tournament ID
     """
+    es.indices.refresh("event-data")
     r = es.search(
         index="event-data",
         body={
