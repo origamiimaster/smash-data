@@ -4,7 +4,11 @@ Gets data from elasticsearch server, and processes it for viewing and interpreta
 
 from elasticsearch import Elasticsearch
 import plotly.graph_objects as go
+import plotly.io as pio
+
 es = Elasticsearch()
+
+pio.renderers.default = "browser"
 
 
 def start_scroll() -> list:
@@ -66,9 +70,28 @@ def graph_win_vs_play_rate(data) -> None:
     fig.show()
 
 
-def get_chars_match_up(data: list) -> dict:
+def get_char_match_up(char: str, data: list) -> dict:
     """
     Gets the relevant match ups for a given character
+    """
+    match_up = {}
+    for game in data:
+        win_char = game["_source"]["winner_char"]
+        lose_char = game["_source"]["loser_char"]
+        if win_char != char and lose_char != char:
+            continue
+        if win_char not in match_up:
+            match_up[win_char] = [0, 0]
+        if lose_char not in match_up:
+            match_up[lose_char] = [0, 0]
+        match_up[win_char][0] += 1
+        match_up[lose_char][1] += 1
+    return match_up
+
+
+def get_chars_match_up(data: list) -> dict:
+    """
+    Gets the relevant match ups for all characters
     """
     match_up = {}
     for game in data:
@@ -84,11 +107,10 @@ def get_chars_match_up(data: list) -> dict:
             match_up[lose_char][win_char] = [0, 0]
         match_up[win_char][lose_char][0] += 1
         match_up[lose_char][win_char][1] += 1
-
     for key1 in match_up:
         for key2 in match_up[key1]:
             percent = match_up[key1][key2][0] / (match_up[key1][key2][0] + match_up[key1][key2][1])
-            match_up[key1][key2] = int(percent*100) / 100
+            match_up[key1][key2] = int(percent * 100) / 100
     for key in match_up:
         match_up[key] = {k: v for k, v in sorted(match_up[key].items(), key=lambda item: item[1])}
     return {k: v for k, v in sorted(match_up.items())}
@@ -132,6 +154,20 @@ def get_best_stage(char, data) -> str:
     return maximum[0]
 
 
+def merge_echoes(data: list) -> None:
+    echoes_dict = {
+        "Dark Samus": "Samus",
+        "Daisy": "Peach",
+        "Richter": "Simon Belmont"
+    }
+    for game in data:
+        if game["_source"]["winner_char"] in echoes_dict:
+            game["_source"]["winner_char"] = echoes_dict[game["_source"]["winner_char"]]
+        if game["_source"]["loser_char"] in echoes_dict:
+            game["_source"]["loser_char"] = echoes_dict[game["_source"]["loser_char"]]
+
+
 if __name__ == "__main__":
     my_data = start_scroll()
+    merge_echoes(my_data)
     graph_win_vs_play_rate(my_data)
