@@ -76,7 +76,8 @@ def get_unfinished_event() -> (int, int):
             ]
         }
     )["hits"]["hits"][0]
-    return r["_source"]["tournament_id"], r["_source"]["event_id"]
+    # print(r)
+    return r["_source"]["tournament_id"], r["_source"]["event_id"], r["_source"]["timestamp"]
 
 
 def mark_as_done(event_id: int) -> None:
@@ -110,13 +111,16 @@ def mark_all_as_not_done() -> None:
     )
 
 
-def add_games_to_elastic(tournament_id: int, event_id: int, games_data: [object]) -> None:
+def add_games_to_elastic(tournament_id: int, event_id: int, event_timestamp, games_data: [object], location: dict) -> \
+        None:
     """
     Adds an event to the elasticsearch server
     """
+    if location["lat"] is None or location["lng"] is None:
+        location = None
     for data in games_data:
-        es.index(
-            index="game-data",
+        r = es.index(
+            index="game-time-loc-data",
             id=data["game_id"],
             body={
                 "tournament_id": tournament_id,
@@ -130,6 +134,12 @@ def add_games_to_elastic(tournament_id: int, event_id: int, games_data: [object]
                 "loser_name": data['loser_name'],
                 "winner_char": data['winner_char'],
                 "loser_char": data['loser_char'],
-                "game_id": data["game_id"]
+                "game_id": data["game_id"],
+                "timestamp": event_timestamp,
+                "location": str(location["lat"]) + "," + str(location["lng"]) if location is not None else None
             }
         )
+
+        # if r['result']:
+        #     print(r['result'])
+    es.indices.refresh("game-time-loc-data")

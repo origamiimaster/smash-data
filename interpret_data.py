@@ -16,7 +16,7 @@ def start_scroll() -> list:
     Uses elasticsearch scroll API to get all the games from the server.
     """
     body = es.search(
-        index="game-data",
+        index="game-time-data",
         scroll="30s",
         size=100,
         body={

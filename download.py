@@ -1,6 +1,8 @@
 """
 Client to download and do all the stuff
 """
+import time
+import json
 import requests
 
 
@@ -94,7 +96,7 @@ class SmashGGClient:
         )
         return r.json()['data']['tournament']
 
-    def get_sets(self, event_id: int, page: int = 1) -> list:
+    def get_sets(self, event_id: int, page: int = 1) -> (list, dict):
         """
         Returns a list of sets for a given event.
         """
@@ -105,6 +107,10 @@ class SmashGGClient:
                 "query": """
                     query SetsByEvent($eventId: ID!, $page: Int!, $perPage: Int!) {
                       event(id: $eventId) {
+                        tournament{
+                            lat
+                            lng
+                        }
                         sets(page: $page, perPage: $perPage) {
                             nodes {
                                 id
@@ -137,9 +143,14 @@ class SmashGGClient:
         try:
             event = r.json()['data']['event']
             if event is None:
-                return []
+                return [], None
             sets = event['sets']['nodes']
         except Exception:
+            print(r)
+            if 'Cannot query more than the 10,000th entry' in json.dumps(r.json()):
+                print("Failed")
+                return [], None
             print(r.json())
             raise
-        return sets
+        # print(event["tournament"])
+        return event["tournament"], sets
