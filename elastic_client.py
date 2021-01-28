@@ -143,3 +143,64 @@ def add_games_to_elastic(tournament_id: int, event_id: int, event_timestamp, gam
         # if r['result']:
         #     print(r['result'])
     es.indices.refresh("game-time-loc-data")
+
+
+def add_sets_to_elastic(sets_to_add, event_id, tournament_id, event_timestamp):
+    total = 0
+    # print("thing y = ")
+    # print(sets_to_add)
+    # sets = sets
+    for game_set in sets_to_add:
+        if not game_set["hasPlaceholder"]:
+            try:
+                # if game_set["games"]:
+                #     for game in game_set["games"]:
+                #         id_val = game["id"]
+                ids = [game_set["slots"][0]["entrant"]["id"], game_set["slots"][1]["entrant"]["id"]]
+                results = game_set["displayScore"]
+                winner_id = game_set['winnerId']
+                loser_id = ids[0] if game_set["winnerId"] == ids[1] else ids[1]
+                full_text = game_set["displayScore"]
+                if full_text == "DQ" or full_text is None:
+                    continue
+                score_1 = full_text[full_text.index(" - ") - 1: full_text.index(" - ")]
+                score_2 = full_text[-1]
+                scores = {game_set['slots'][0]['entrant']['id']: score_1,
+                          game_set['slots'][1]['entrant']['id']: score_2}
+                winner_score = scores[winner_id]
+                loser_score = scores[loser_id]
+                # print(winner_score)
+                # print(loser_score)
+                r = es.index(
+                    index="set-data",
+                    id=game_set["id"],
+                    body={
+                        "tournament_id": tournament_id,
+                        "event_id": event_id,
+                        "set_id": game_set['id'],
+                        "game_ids": [game["id"] for game in game_set["games"]] if game_set["games"] is not None else
+                        None,
+                        "winner_id": winner_id,
+                        "loser_id": loser_id,
+                        "round_text": game_set['fullRoundText'],
+                        "timestamp": event_timestamp,
+                        "winner_score": winner_score,
+                        "loser_score": loser_score
+                        # "game_number": data['game_number'],
+                        # "stage_name": data['stage_name'],
+                        # "winner_id": data['winner_id'],
+                        # "loser_id": data['loser_id'],
+                        # "winner_name": data['winner_name'],
+                        # "loser_name": data['loser_name'],
+                        # "winner_char": data['winner_char'],
+                        # "loser_char": data['loser_char'],
+                        # "game_id": data["game_id"],
+                        # "location":str(location["lat"]) + "," + str(location["lng"]) if location is not None else None
+                    }
+                )
+                total += 1
+            except (ValueError, AttributeError, TypeError, IndexError) as e:
+                print(e)
+                # print(game_set["displayScore"])
+                continue
+    return total

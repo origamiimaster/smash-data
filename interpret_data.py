@@ -36,6 +36,56 @@ def start_scroll() -> list:
     return results
 
 
+def event_scroll() -> list:
+    """
+    Uses elasticsearch scroll API to get all the games from the server.
+    """
+    body = es.search(
+        index="event-data",
+        scroll="30s",
+        size=100,
+        body={
+            "query": {
+                "match_all": {}
+            }
+        }
+    )
+    results = []
+    while len(results) < body["hits"]["total"]["value"]:
+        for hit in body["hits"]["hits"]:
+            results.append(hit)
+        body = es.scroll(
+            scroll_id=body["_scroll_id"],
+            scroll="30s"
+        )
+    return results
+
+
+def get_event_sets(my_event_id):
+    body = es.search(
+        index="game-time-loc-data",
+        scroll="30s",
+        size=100,
+        body={
+            "query": {
+                "match": {
+                    "event_id": my_event_id
+                }
+            }
+        }
+    )
+    # print(body)
+    results = []
+    while len(results) < body["hits"]["total"]["value"]:
+        for hit in body["hits"]["hits"]:
+            results.append(hit)
+        body = es.scroll(
+            scroll_id=body["_scroll_id"],
+            scroll="30s"
+        )
+    return results
+    # return body
+
 def graph_win_vs_play_rate(data) -> None:
     """
     Calculates play rates and win rates, and graphs with plotly.
@@ -171,3 +221,4 @@ if __name__ == "__main__":
     my_data = start_scroll()
     merge_echoes(my_data)
     graph_win_vs_play_rate(my_data)
+    # print("nothing for now")
