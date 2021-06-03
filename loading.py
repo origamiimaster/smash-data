@@ -26,16 +26,30 @@ class LoadingBar:
     def set(self, value):
         self.current = value
 
-class TimingBar(LoadingBar):
-    time = None
-    def __init__(self, total):
-        LoadingBar.__init__(self, total_intervals=total)
-        self.time = datetime.datetime.now()
-    def increment(self):
-        LoadingBar.increment(self)
+class Timer:
+    def __init__(self):
+        self.start_time = datetime.datetime.now()
+        self.curr_time = datetime.datetime.now()
+        self.total_events = 0
+        self.time_passed = 0
+    def update(self):
+        self.total_events += 1
+        self.curr_time = datetime.datetime.now()
+        self.time_passed = self.curr_time - self.start_time
+    def get_avg(self):
+        if self.total_events == 0:
+            return 0
+        return self.time_passed / self.total_events
+    def predict(self, future_events):
+        return self.get_avg() * (future_events - self.total_events)
+    def get_total(self):
+        return self.time_passed
 
-
-
+class TimingBar(Timer):
+    def __init__(self, total_intervals):
+        Timer.__init__(self)
+        self.loader = LoadingBar(total_intervals)
+    
 
 if __name__ == "__main__":
     import time

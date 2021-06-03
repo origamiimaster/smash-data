@@ -7,6 +7,23 @@ import datetime
 es = Elasticsearch()
 
 
+def get_unfinished_event_count() -> int:
+    """Determines how many unprocessed events remain"""
+    r = es.search(
+        index="event-data",
+        scroll="30s",
+        size=1,
+        body={"query": {
+            "match": {
+                "done": False
+            }
+        },
+        }
+    )
+    es.clear_scroll(scroll_id=r["_scroll_id"])
+    return int(r["hits"]["total"]["value"])
+
+
 def get_last_timestamp() -> int or None:
     """
     Returns the most recent event timestamp from the elasticsearch server
@@ -18,13 +35,13 @@ def get_last_timestamp() -> int or None:
                 "match_all": {}
             },
             "size": 1,
-            "sort": [
-                {
-                    "timestamp": {
-                        "order": "desc"
-                    }
-                }
-            ]
+            # "sort": [
+            #     {
+            #         "timestamp": {
+            #             "order": "desc"
+            #         }
+            #     }
+            # ]
         }
     )
     try:
@@ -57,7 +74,7 @@ def get_unfinished_event() -> (int, int):
     """
     Gets the most recent event that is not yet processed, returning it's ID and it's tournament ID
     """
-    es.indices.refresh("event-data")
+    es.indices.refresh(index="event-data")
     r = es.search(
         index="event-data",
         body={
@@ -112,11 +129,13 @@ def mark_all_as_not_done() -> None:
 
 
 def add_games_to_elastic(tournament_id: int, event_id: int, event_timestamp, games_data: [object], location: dict) -> \
-        None:
+        tuple:
     """
     Adds an event to the elasticsearch server
     """
-    if location["lat"] is None or location["lng"] is None:
+    total_updated = 0
+    total_created = 0
+    if location is None or location["lat"] is None or location["lng"] is None:
         location = None
     for data in games_data:
         r = es.index(
@@ -139,27 +158,64 @@ def add_games_to_elastic(tournament_id: int, event_id: int, event_timestamp, gam
                 "location": str(location["lat"]) + "," + str(location["lng"]) if location is not None else None
             }
         )
-
+        # total += 1
+        if r['result'] == 'updated':
+            total_updated += 1
+        elif r['result'] == 'created':
+            total_created += 1
+        # print(r['result'])
         # if r['result']:
         #     print(r['result'])
-    es.indices.refresh("game-time-loc-data")
+    es.indices.refresh(index="game-time-loc-data")
+    return (total_created, total_updated)
 
 
 def add_sets_to_elastic(sets_to_add, event_id, tournament_id, event_timestamp):
-    total = 0
+    total_updated = 0
+    total_created = 0
     # print("thing y = ")
     # print(sets_to_add)
     # sets = sets
     for game_set in sets_to_add:
         if not game_set["hasPlaceholder"]:
             try:
-                # if game_set["games"]:
-                #     for game in game_set["games"]:
-                #         id_val = game["id"]
+                if "preview" in str(game_set['id']):
+                    print("preview game")
+                    continue
+                if game_set['displayScore'] is None:
+                    continue
+
                 ids = [game_set["slots"][0]["entrant"]["id"], game_set["slots"][1]["entrant"]["id"]]
-                results = game_set["displayScore"]
                 winner_id = game_set['winnerId']
                 loser_id = ids[0] if game_set["winnerId"] == ids[1] else ids[1]
+                if game_set["slots"] is None or game_set["slots"][0]["entrant"] is None:
+                    continue
+                if "participants" not in game_set["slots"][0]["entrant"] or \
+                        game_set["slots"][0]["entrant"]["participants"] is None:
+                    print("something went wrong")
+                    # print(game_set)
+                    continue
+
+                if game_set["slots"][0]["entrant"]["participants"][0]["user"] is None:
+                    user_id_0 = None
+                    user_slug_0 = None
+                else:
+                    user_id_0 = game_set["slots"][0]["entrant"]["participants"][0]["user"]["id"]
+                    user_slug_0 = game_set["slots"][0]["entrant"]["participants"][0]["user"]["slug"]
+                if game_set["slots"][0]["entrant"]["participants"][0]["user"] is None:
+                    user_id_1 = None
+                    user_slug_1 = None
+                else:
+                    user_id_1 = game_set["slots"][0]["entrant"]["participants"][0]["user"]["id"]
+                    user_slug_1 = game_set["slots"][0]["entrant"]["participants"][0]["user"]["slug"]
+
+                user_ids = {game_set["slots"][0]["entrant"]["id"]: (user_id_0, user_slug_0),
+                            game_set["slots"][1]["entrant"]["id"]: (user_id_1, user_slug_1),
+                            None: None}
+                winner_user_id = user_ids[winner_id][0]
+                winner_slug = user_ids[winner_id][1]
+                loser_user_id = user_ids[loser_id][0]
+                loser_slug = user_ids[loser_id][1]
                 full_text = game_set["displayScore"]
                 if full_text == "DQ" or full_text is None:
                     continue
@@ -167,8 +223,11 @@ def add_sets_to_elastic(sets_to_add, event_id, tournament_id, event_timestamp):
                 score_2 = full_text[-1]
                 scores = {game_set['slots'][0]['entrant']['id']: score_1,
                           game_set['slots'][1]['entrant']['id']: score_2}
+                # slugs = {game_set['slots'][0]['entrant']['id']: score_1,
+                #          game_set['slots'][1]['entrant']['id']: score_2}
                 winner_score = scores[winner_id]
                 loser_score = scores[loser_id]
+
                 # print(winner_score)
                 # print(loser_score)
                 r = es.index(
@@ -185,7 +244,11 @@ def add_sets_to_elastic(sets_to_add, event_id, tournament_id, event_timestamp):
                         "round_text": game_set['fullRoundText'],
                         "timestamp": event_timestamp,
                         "winner_score": winner_score,
-                        "loser_score": loser_score
+                        "loser_score": loser_score,
+                        "winner_user_id": winner_user_id,
+                        "loser_user_id": loser_user_id,
+                        "winner_slug":  winner_slug,
+                        "loser_slug": loser_slug
                         # "game_number": data['game_number'],
                         # "stage_name": data['stage_name'],
                         # "winner_id": data['winner_id'],
@@ -198,9 +261,55 @@ def add_sets_to_elastic(sets_to_add, event_id, tournament_id, event_timestamp):
                         # "location":str(location["lat"]) + "," + str(location["lng"]) if location is not None else None
                     }
                 )
-                total += 1
+                # total += 1
+                if r['result'] == 'updated':
+                    total_updated += 1
+                elif r['result'] == 'created':
+                    total_created += 1
+            # except IndexError as e:
+            #     print(e)
+            #     continue
+            # except TypeError:
+            #     print(game_set)
             except (ValueError, AttributeError, TypeError, IndexError) as e:
                 print(e)
-                # print(game_set["displayScore"])
                 continue
-    return total
+    return (total_created, total_updated)
+
+
+def get_set_by_set_id(set_id):
+    r = es.search(
+        index="set-data",
+        scroll="30s",
+        size=1,
+        body={"query": {
+            "match": {
+                "set_id": set_id
+            }
+        },
+        }
+    )
+    try:
+        es.clear_scroll(scroll_id=r["_scroll_id"])
+        return r["hits"]["hits"][0]
+    except IndexError:
+        return None
+
+
+def get_event_by_event_id(event_id):
+    r = es.search(
+        index="event-data",
+        scroll="30s",
+        size=1,
+        body={"query": {
+            "match": {
+                "event_id": event_id
+            }
+        },
+        }
+    )
+    try:
+        es.clear_scroll(scroll_id=r["_scroll_id"])
+        return r["hits"]["hits"][0]
+    except IndexError:
+        return None

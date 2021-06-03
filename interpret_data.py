@@ -5,7 +5,7 @@ Gets data from elasticsearch server, and processes it for viewing and interpreta
 from elasticsearch import Elasticsearch
 import plotly.graph_objects as go
 import plotly.io as pio
-
+from loading import LoadingBar
 es = Elasticsearch()
 
 pio.renderers.default = "browser"
@@ -33,6 +33,7 @@ def start_scroll() -> list:
             scroll_id=body["_scroll_id"],
             scroll="30s"
         )
+    es.clear_scroll(scroll_id=body["_scroll_id"])
     return results
 
 
@@ -58,12 +59,51 @@ def event_scroll() -> list:
             scroll_id=body["_scroll_id"],
             scroll="30s"
         )
+    es.clear_scroll(scroll_id=body["_scroll_id"])
+    return results
+
+
+def set_scroll() -> list:
+    """
+    Uses elasticsearch scroll API to get all the games from the server.
+    """
+    body = es.search(
+        index="set-data",
+        scroll="30s",
+        size=10000,
+        body={
+            "query": {
+                "match_all": {}
+            },
+            "sort": [
+                {
+                    "timestamp": {
+                        "order": "desc"
+                    }
+                }
+            ]
+        }
+    )
+    my_bar = LoadingBar(body["hits"]["total"]["value"])
+    results = []
+    while len(results) < body["hits"]["total"]["value"]:
+        my_bar.current = len(results)
+        my_bar.print()
+        for hit in body["hits"]["hits"]:
+            results.append(hit)
+        body = es.scroll(
+            scroll_id=body["_scroll_id"],
+            scroll="30s"
+        )
+    es.clear_scroll(scroll_id=body["_scroll_id"])
+    results.reverse()
+    print()
     return results
 
 
 def get_event_sets(my_event_id):
     body = es.search(
-        index="game-time-loc-data",
+        index="set-data",
         scroll="30s",
         size=100,
         body={
@@ -83,8 +123,9 @@ def get_event_sets(my_event_id):
             scroll_id=body["_scroll_id"],
             scroll="30s"
         )
+    es.clear_scroll(scroll_id=body["_scroll_id"])
     return results
-    # return body
+
 
 def graph_win_vs_play_rate(data) -> None:
     """

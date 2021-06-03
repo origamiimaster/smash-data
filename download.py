@@ -139,6 +139,12 @@ class SmashGGClient:
                                 slots{
                                     entrant{
                                         id
+                                        participants{
+                                            user{
+                                                id
+                                                slug
+                                            }
+                                        }
                                     }
                                 }
                                 games {
@@ -161,7 +167,7 @@ class SmashGGClient:
                       }
                     }
                 """,
-                "variables": f'{{"eventId": {event_id}, "page": {page}, "perPage": {30} }}',
+                "variables": f'{{"eventId": {event_id}, "page": {page}, "perPage": {25} }}',
             },
             headers={
                 'Authorization': f'Bearer {self.api}',
@@ -172,11 +178,12 @@ class SmashGGClient:
             if event is None:
                 return [], None
             sets = event['sets']['nodes']
-        except Exception:
+        except Exception as e:
+            print(e)
             print(r)
-            if 'Cannot query more than the 10,000th entry' in json.dumps(r.json()):
+            if 'Cannot query more than the 10,000th entry' in str(r.json()):
                 print("Failed")
-                return [], None
+                return None, None
             print(r.json())
             raise
         # print(event["tournament"])
